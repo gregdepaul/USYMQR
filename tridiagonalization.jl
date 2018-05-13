@@ -1,4 +1,4 @@
-A = rand(4, 4)
+A = rand(10, 10);
 
 (m,n) = size(A);
 b = randn(1 ,n);
@@ -21,7 +21,7 @@ i = 1;
 u = A*Q[:, i];
 v = ctranspose(A)*P[:, i];
 
-maxiters = 5;
+maxiters = m;
 while i < maxiters
     if i > 1
         u = u - gamma[i]*P[:, i - 1];
@@ -40,8 +40,8 @@ while i < maxiters
         push!(beta, norm(u));
         push!(gamma, norm(v));
 
-        P[:, i] = u/beta[i+1];
-        Q[:, i] = v/gamma[i+1];
+        P[:, i+1] = u/beta[i+1];
+        Q[:, i+1] = v/gamma[i+1];
     end
 
     i = i + 1;
@@ -53,4 +53,4 @@ betaFT = convert(Array{Float64,1}, beta);
 alphaFT = convert(Array{Float64,1}, alpha);
 gammaFT = convert(Array{Float64,1}, gamma);
 
-T = Tridiagonal(betaFT[2:size(betaFT,1)-1], alphaFT, gammaFT[2:size(gammaFT,1)-1]);
+T = Tridiagonal(betaFT[2:size(alphaFT,1)], alphaFT, gammaFT[2:size(alphaFT,1)]);
