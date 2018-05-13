@@ -18,7 +18,8 @@ function tridiagonalization(A)
     Q[:, 1] = c / gamma[1]
 
     i = 1;
-    while 1 == 1
+    maxiters = 5;
+    while i < maxiters
 
         u = A*Q[:, i];
         v = ctranspose(A)*P[:, i];
@@ -30,12 +31,12 @@ function tridiagonalization(A)
 
         push!(alpha, ctranspose(P[:, i])*u);
 
-        print(alpha)
+        #print(alpha)
         u = u - alpha[i]*P[: ,i];
         v = v - ctranspose(alpha[i])*Q[:, i];
 
         if (norm(u) == 0 || norm(v) == 0)
-            #break;
+            break;
         else
             push!(beta, norm(u));
             push!(gamma, norm(v));
@@ -45,10 +46,13 @@ function tridiagonalization(A)
         end
 
         i = i + 1;
-
     end
 
-    T = Tridiagonal(beta, alpha, gamma);
+    betaFT = convert(Array{Float64,1}, beta);
+    alphaFT = convert(Array{Float64,1}, alpha);
+    gammaFT = convert(Array{Float64,1}, gamma);
+
+    T = Tridiagonal(betaFT[2:size(betaFT,1)-1], alphaFT, gammaFT[2:size(gammaFT,1)-1]);
 
     return P, T, Q;
 
@@ -56,4 +60,4 @@ function tridiagonalization(A)
 
 A = rand(4, 4)
 (P, T, Q) = tridiagonalization(A);
-print(m)
+print(norm(P'*A*Q - T))
