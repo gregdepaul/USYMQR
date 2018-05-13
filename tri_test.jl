@@ -1,7 +1,7 @@
 include("tridiagonalization.jl")
 
 # A small code to test tridiagonalization file
-
-A = rand(40, 40)
-(P, T, Q) = tridiagonalization(A, 1 / 10^(10), 1000)
-print(norm(P'*A*Q - T))
+m = 100;
+A = rand(m, m)
+(P, T, Q) = tridiagonalization(A, 1 / 10^(10), m+1)
+print(norm(P*T*Q' - A))
