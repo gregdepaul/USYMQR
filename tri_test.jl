@@ -1,7 +1,7 @@
 function tridiagonalization(A)
 
-    (m,n) = size(A);
-    b = randn(1 ,n);
+    (m,m) = size(A);
+    b = randn(1 ,m);
     c = randn(1, m);
 
     beta = [];
@@ -11,31 +11,31 @@ function tridiagonalization(A)
     push!(beta, norm(b));
     push!(gamma, norm(c));
 
-    P = zeros(m,n);
-    Q = zeros(m,n);
+    P = zeros(m,m);
+    Q = zeros(m,m);
 
     P[:, 1] = b / beta[1]
     Q[:, 1] = c / gamma[1]
 
     i = 1;
-    while 1 == 1
+    maxiters = m;
+    while i < maxiters
 
         u = A*Q[:, i];
-        v = ctranspose(A)*P[:, i];
+        v = A'*P[:, i];
 
         if i > 1
             u = u - gamma[i]*P[:, i - 1];
             v = v - beta[i]*Q[:, i - 1];
         end
 
-        push!(alpha, ctranspose(P[:, i])*u);
+        push!(alpha, P[:, i]'*u);
 
-        print(alpha)
         u = u - alpha[i]*P[: ,i];
-        v = v - ctranspose(alpha[i])*Q[:, i];
+        v = v - alpha[i]'*Q[:, i];
 
         if (norm(u) == 0 || norm(v) == 0)
-            #break;
+            break;
         else
             push!(beta, norm(u));
             push!(gamma, norm(v));
@@ -45,15 +45,21 @@ function tridiagonalization(A)
         end
 
         i = i + 1;
-
     end
 
-    T = Tridiagonal(beta, alpha, gamma);
+    betaFT = convert(Array{Float64,1}, beta);
+    alphaFT = convert(Array{Float64,1}, alpha);
+    gammaFT = convert(Array{Float64,1}, gamma);
+
+    T = Tridiagonal(betaFT[2:size(alphaFT,1)], alphaFT, gammaFT[2:size(alphaFT,1)]);
+
+    P = P[:, 1:length(alphaFT)];
+    Q = Q[:, 1:length(alphaFT)];
 
     return P, T, Q;
 
     end
 
-A = rand(4, 4)
-(P, T, Q) = tridiagonalization(A);
-print(m)
+A = rand(10, 10)
+(P, T, Q) = tridiagonalization(A)
+print(norm(P'*A*Q - T))
