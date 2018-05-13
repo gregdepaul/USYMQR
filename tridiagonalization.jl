@@ -1,4 +1,4 @@
-function tridiagonalization(A, epsilon)
+function tridiagonalization(A, epsilon, max_iterations)
 
     (m,m) = size(A);
     b = randn(1 ,m);
@@ -11,15 +11,14 @@ function tridiagonalization(A, epsilon)
     push!(beta, norm(b));
     push!(gamma, norm(c));
 
-    P = zeros(m,2*m);
-    Q = zeros(m,2*m);
+    P = zeros(m,max_iterations);
+    Q = zeros(m,max_iterations);
 
     P[:, 1] = b / beta[1]
     Q[:, 1] = c / gamma[1]
 
     i = 1;
-    maxiters = 2*m;
-    while i < maxiters
+    while i < max_iterations
 
         u = A*Q[:, i];
         v = A'*P[:, i];
