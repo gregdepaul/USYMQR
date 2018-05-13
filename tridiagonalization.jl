@@ -55,6 +55,6 @@ function tridiagonalization(A, epsilon, max_iterations)
     P = P[:, 1:length(alphaFT)];
     Q = Q[:, 1:length(alphaFT)];
 
-    return P, T, Q;
+    return P, T, Q, betaFT[end];
 
     end
