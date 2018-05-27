@@ -27,5 +27,4 @@ x0 = rand(1, size(A,1));
 b1 = norm(b'-A*x0');
 beta1 = zeros(1,size(S,1))';
 beta1[end] = r0;
-type()
 x = lsqr(S,beta1);
