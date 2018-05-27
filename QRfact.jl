@@ -2,7 +2,7 @@ function QRfact(iter,dictVars)
     # dictVars has all of the following vars for func inputs below
     #INITIALIZATION OUTSIDE FUNC-back in tridiag looop
 
-    ###unpack vars here
+    #unpack vars here
     alpha = dictVars['alpha'];
     beta = dictVars['beta'];
     gamma = dictVars['gamma'];
@@ -28,11 +28,14 @@ function QRfact(iter,dictVars)
     s_bar = dictVars['s_bar'];
 
     # plane rotation
-    planDict = planeRotation(iter,c,s,s_bar,alpha,beta,gamma);
+    planeDict = planeRotation(iter,c,s,s_bar,alpha,beta,gamma);
+
+    v_prev = dictVars['v_prev'];
+    tow_prev = dictVars['tow_prev'];
 
     # Update solution
-    updateDict = updateSoln(v_prev,tow_prev,sigma,rho,w1,w2);
+    updateDict = updateSoln(v_prev,tow_prev,planeDict['sigma'],planeDict['rho'],planeDict['w1'],planeDict['w2']);
 
     #CHECK CONVERGENCE OUTSIDE-back in tridiag loop
-
+    return Dict('gamma' = > gamma,'rh_s2' = > planeDict['rh_s2'],'s' = > planeDict['s'],'c' = > planeDict['c'],'t' = > planeDict['t']);
 end
