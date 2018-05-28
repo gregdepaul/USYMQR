@@ -1,4 +1,4 @@
-function planeRotation(iter,c,s,s_bar,alpha,beta,gamma)
+function planeRotation(iter, c, s, s_bar, rh_s1, alpha, beta, gamma)
 
     #plane rotation vars
     sigma = c*s_bar + s*alpha;
@@ -19,6 +19,6 @@ function planeRotation(iter,c,s,s_bar,alpha,beta,gamma)
     rh_s1 =  c*t;
     rh_s2 = -s*t;
 
-    return Dict('s'=>s,'t'=>t,'c'=>c,'sigma'=>sigma,'tow' => tow,'rho'=>rho,'rh_s1'=>rh_s1,'rh_s2'=>rh_s2);
+    return Dict{String,Any}("s"=>s,"t"=>t,"c"=>c,"sigma"=>sigma,"tow" => tow,"rho"=>rho,"rh_s1"=>rh_s1,"rh_s2"=>rh_s2);
 
 end
