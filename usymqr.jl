@@ -7,31 +7,50 @@ import IterativeSolvers.zerox
 import IterativeSolvers.reserve!
 import IterativeSolvers.setconv
 import IterativeSolvers.shrink!
+import IterativeSolvers.nextiter!
+
 
 mutable struct USYMQRIterable{matT, solT, vecT <: DenseVector, smallVecT <: DenseVector, rotT <: Number, realT <: Real}
     A::matT
     x::solT
 
+    # Diagonalization Constants
+    beta::realT
+    gamma::realT
+    gamma_prev::realT
+    proj::realT
+
     # Krylov basis vectors
     v_prev::vecT
-    v_curr::vecT
-    v_next::vecT
+    v::vecT
+    u::vecT
+
+    # Plane Rotation Update Vectors
+    p::vecT
+    q::vecT
 
     # W = R * inv(V) is computed using 3-term recurrence
-    w_prev::vecT
-    w_curr::vecT
-    w_next::vecT
+    w1::vecT
+    w2::vecT
 
-    # Vector of size 4, holding the active column of the Hessenberg matrix
     # rhs is just two active values of the right-hand side.
-    H::smallVecT
-    rhs::smallVecT
+    rhs1::smallVecT
+    rhs2::smallVecT
 
     # Some Givens rotations
     c_prev::rotT
-    s_prev::rotT
-    c_curr::rotT
-    s_curr::rotT
+    c::rotT
+    s::rotT
+
+    # QR Constants
+    tau::realT
+    sbar::realT
+    tau_prev::realT
+
+    # Convergence Criterion
+    q1::realT
+    q2::realT
+    AAnorm::realT
 
     # Bookkeeping
     mv_products::Int
@@ -45,16 +64,42 @@ function usymqr_iterable!(x, A, b;
     tol = sqrt(eps(real(eltype(b)))),
     maxiter = size(A, 2)
 )
+
+    (m,n) = size(A);
     T = eltype(x)
     HessenbergT = real(T)
 
-    v_prev = similar(x)
-    v_curr = similar(x)
-    copy!(v_curr, b)
-    v_next = similar(x)
-    w_prev = similar(x)
-    w_curr = similar(x)
-    w_next = similar(x)
+    c = rand(T, n, 1);
+
+    beta1 = norm(b);
+    gamma = norm(c);
+
+    v_prev = similar(b)
+    v = similar(b)
+    copy!(v, b / beta1)
+
+    u = similar(c)
+    copy!(u, c / gamma)
+
+    p = similar(v);
+    q = similar(u);
+    beta = 0;
+    gamma = 0;
+
+    sbar = gamma;
+    rhs1 = beta1;
+    AAnorm = 0;
+    tau = 0;
+    gamma_prev = 0;
+    c_prev = 1;
+    c = 1;
+    s = 0;
+    q1 = 0;
+    q2 = 0;
+    proj = 0;
+
+    w1 = similar(x)
+    w2 = similar(x)
 
     mv_products = 0
 
@@ -66,95 +111,117 @@ function usymqr_iterable!(x, A, b;
         mv_products = 1
     end
 
-    resnorm = norm(v_curr)
-    reltol = resnorm * tol
-
-    # Last active column of the Hessenberg matrix
-    # and last two entries of the right-hand side
-    H = zeros(HessenbergT, 4)
-    rhs = [resnorm; zero(HessenbergT)]
-
-    # Normalize the first Krylov basis vector
-    scale!(v_curr, inv(resnorm))
-
-    # Givens rotations
-    c_prev, s_prev = one(T), zero(T)
-    c_curr, s_curr = one(T), zero(T)
+    resnorm = beta1;
+    reltol = resnorm * tol;
 
     USYMQRIterable(
         A, x,
-        v_prev, v_curr, v_next,
-        w_prev, w_curr, w_next,
-        H, rhs,
-        c_prev, s_prev, c_curr, s_curr,
+        beta, gamma, gamma_prev, proj,
+        v_prev, v, u,
+        p, q,
+        w1, w2,
+        rhs1, 0.0,
+        c_prev, c, s,
+        tau, sbar, 0.0,
+        q1, q2, AAnorm,
         mv_products, maxiter, reltol, resnorm
     )
 end
+
+Arnorm(m::USYMQRIterable) = m.resnorm*norm([m.gamma_prev*m.q1 + m.proj*m.q2; m.gamma*m.q2]);
+Anorm(m::USYMQRIterable) = sqrt(m.AAnorm);
+AAnorm(m::USYMQRIterable) = AAnorm(m) + m.proj^2 + m.beta^2 + m.gamma^2;
+
+
+condition1(m::USYMQRIterable) = (Arnorm(m)/(Anorm(m)*m.resnorm) < m.tolerance);
+
+condition2(m::USYMQRIterable) = (m.resnorm < m.tolerance*Anorm(m) + m.tolerance);
 
 converged(m::USYMQRIterable) = m.resnorm ≤ m.tolerance
 
 start(::USYMQRIterable) = 1
 
-done(m::USYMQRIterable, iteration::Int) = iteration > m.maxiter || converged(m)
+done(m::USYMQRIterable, iteration::Int) = iteration > m.maxiter || condition1(m) || condition2(m);
 
 function next(m::USYMQRIterable, iteration::Int)
-    # v_next = A * v_curr - H[2] * v_prev
-    A_mul_B!(m.p, m.A, m.v_curr)
 
-    iteration > 1 && axpy!(-m.H[2], m.v_prev, m.v_next)
+    m.v_prev = m.v;
+    m.tau_prev = m.tau;
 
-    # Orthogonalize w.r.t. v_curr
-    proj = dot(m.v_curr, m.v_next)
-    m.H[3] = real(proj)
-    axpy!(-proj, m.v_curr, m.v_next)
+    # p = A*v - gama*p;
+    p = A_mul_B(p, m.A, m.v);
+    axpy!(-m.gamma, m.p, p);
+    m.p = p;
 
-    # Normalize
-    m.H[4] = norm(m.v_next)
-    scale!(m.v_next, inv(m.H[4]))
+    #q = A'*u - beta*q;
+    q = Ac_mul_B(q, m.A, m.u);
+    axpy!(-m.beta, m.q, q);
+    m.q = q;
 
-    # Rotation on H[1] and H[2]. Note that H[1] = 0 initially
-    if iteration > 2
-        m.H[1] = m.s_prev * m.H[2]
-        m.H[2] = m.c_prev * m.H[2]
+    # Orthogonalize w.r.t. m.u
+    m.proj = dot(m.p, m.u);
+    temp = m.u;
+    m.u = m.p;
+    axpy!(-m.proj, temp, m.u)
+    m.p = temp;
+
+    # Orthogonalize w.r.t. m.v
+    temp = m.v;
+    m.v = m.q;
+    axpy!(-m.proj, temp, m.v)
+    m.q = temp;
+
+    # Normalize u, v with beta and gamma
+    m.beta = norm(m.u);
+    m.gamma = norm(m.v);
+    m.u /= m.beta;
+    m.v /= m.gamma;
+
+    # Consider using c, s, m.H[3] = givensAlgorithm(m.H[3], m.H[4])
+    # Form QR factorization
+    sigma = m.c * m.sbar + m.s * proj;
+    rbar = -m.s * m.sbar + m.c * proj;
+    m.tau = m.s * m.gamma;
+    m.sbar = m.c * m.gama;
+
+    if iteration == 1
+        rbar = temp;
+        m.sbar = m.gamma;
     end
 
-    # Rotation on H[2] and H[3]
-    if iteration > 1
-        tmp = -conj(m.s_curr) * m.H[2] + m.c_curr * m.H[3]
-        m.H[2] = m.c_curr * m.H[2] + m.s_curr * m.H[3]
-        m.H[3] = tmp
-    end
+    rho = sqrt(m.rbar^2 + m.beta^2);
+    m.c = m.rbar/rho;
+    m.s = m.beta/rho;
 
     # Next rotation
-    c, s, m.H[3] = givensAlgorithm(m.H[3], m.H[4])
-
-    # Apply as well to the right-hand side
-    m.rhs[2] = -conj(s) * m.rhs[1]
-    m.rhs[1] = c * m.rhs[1]
-
-    # Update W = V * inv(R). Two axpy's can maybe be one MV.
-    copy!(m.w_next, m.v_curr)
-    iteration > 1 && axpy!(-m.H[2], m.w_curr, m.w_next)
-    iteration > 2 && axpy!(-m.H[1], m.w_prev, m.w_next)
-    scale!(m.w_next, inv(m.H[3]))
+    temp = m.rhs1;
+    m.rhs1 =  m.c * temp;
+    m.rhs2 = -m.s * temp;
 
     # Update solution x
-    axpy!(m.rhs[1], m.w_next, m.x)
-
-    # Move on: next -> curr, curr -> prev
-    m.v_prev, m.v_curr, m.v_next = m.v_curr, m.v_next, m.v_prev
-    m.w_prev, m.w_curr, m.w_next = m.w_curr, m.w_next, m.w_prev
-    m.c_prev, m.s_prev, m.c_curr, m.s_curr = m.c_curr, m.s_curr, c, s
-    m.rhs[1] = m.rhs[2]
-
-    # Due to symmetry of the tri-diagonal matrix
-    m.H[2] = m.H[4]
+    updateSoln!(m.x, m.rhs1, m.v_prev, m.tau_prev, sigma, rho, m.w1, m.w2)
 
     # The approximate residual is cheaply available
-    m.resnorm = abs(m.rhs[2])
+    m.resnorm = abs(m.rhs2);
+    m.q1 = -m.c_prev * m.s;
+    m.q2 = m.c;
+
+    m.rhs1 = m.rhs2;
+    m.gamma_prev = m.gamma;
+    m.c_prev = m.c;
 
     m.resnorm, iteration + 1
 end
+
+
+function updateSoln!(x, rh_s1, v_prev, tau_prev, sigma, rho, w1, w2)
+    # Update solution
+    w3 = ( v_prev - sigma*w2 - tau_prev*w1 )/rho;
+    x = x + rh_s1*w3;
+    w1 = w2;
+    w2 = w3;
+end
+
 
 """
     usymqr!(x, A, b; kwargs...) -> x, [history]
@@ -209,13 +276,13 @@ function usymqr!(x, A, b;
         history.mvps = iterable.mv_products
     end
 
-   #  for (iteration, resnorm) = enumerate(iterable)
-   #      if log
-   #          nextiter!(history, mvps = 1)
-   #          push!(history, :resnorm, resnorm)
-   #      end
-   #     verbose && @printf("%3d\t%1.2e\n", iteration, resnorm)
-   # end
+    # for (iteration, resnorm) = enumerate(iterable)
+    #     if log
+    #         nextiter!(history, mvps = 1)
+    #         push!(history, :resnorm, resnorm)
+    #     end
+    #     verbose && @printf("%3d\t%1.2e\n", iteration, resnorm)
+    # end
 
     verbose && println()
     log && setconv(history, converged(iterable))
