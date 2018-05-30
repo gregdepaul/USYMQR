@@ -3,33 +3,24 @@ export usymqr_iterable, usymqr, usymqr!
 import Base.LinAlg: BLAS.axpy!, givensAlgorithm
 import Base: start, next, done
 
+import IterativeSolvers.zerox
+import IterativeSolvers.reserve!
+import IterativeSolvers.setconv
+import IterativeSolvers.shrink!
+
 mutable struct USYMQRIterable{matT, solT, vecT <: DenseVector, smallVecT <: DenseVector, rotT <: Number, realT <: Real}
     A::matT
     x::solT
 
-    beta1::realT
-    gama1::realT
-    beta::realT
-    gama::realT
-
-    AAnorm::realT
-    sbar::realT
-    rhs1::realT
-    tau::realT
-    gamold::realT
-    cold::realT
-
     # Krylov basis vectors
-    u::vecT
-    v::vecT
-    p::vecT
-    q::vecT
+    v_prev::vecT
+    v_curr::vecT
+    v_next::vecT
 
     # W = R * inv(V) is computed using 3-term recurrence
-    w1::vecT
-    w2::vecT
-    q1::vecT
-    q2::vecT
+    w_prev::vecT
+    w_curr::vecT
+    w_next::vecT
 
     # Vector of size 4, holding the active column of the Hessenberg matrix
     # rhs is just two active values of the right-hand side.
@@ -37,10 +28,13 @@ mutable struct USYMQRIterable{matT, solT, vecT <: DenseVector, smallVecT <: Dens
     rhs::smallVecT
 
     # Some Givens rotations
-    c::rotT
-    s::rotT
+    c_prev::rotT
+    s_prev::rotT
+    c_curr::rotT
+    s_curr::rotT
 
     # Bookkeeping
+    mv_products::Int
     maxiter::Int
     tolerance::realT
     resnorm::realT
@@ -51,44 +45,49 @@ function usymqr_iterable!(x, A, b;
     tol = sqrt(eps(real(eltype(b)))),
     maxiter = size(A, 2)
 )
+    T = eltype(x)
+    HessenbergT = real(T)
 
-    (m,n) = size(A);
-    c = randn(1, m);
+    v_prev = similar(x)
+    v_curr = similar(x)
+    copy!(v_curr, b)
+    v_next = similar(x)
+    w_prev = similar(x)
+    w_curr = similar(x)
+    w_next = similar(x)
 
-    beta1  = norm(b);
-    u     = b/beta1;
-    gama1 = norm(c);
-    v     = c/gama1;
+    mv_products = 0
 
-    p = zeros(m,1);
-    q = zeros(n,1);
-    beta = 0;
-    gama = 0;
+    # For nonzero x's, we must do an MV for the initial residual vec
+    if !initially_zero
+        # Use v_next to store Ax; v_next will soon be overwritten.
+        A_mul_B!(v_next, A, x)
+        axpy!(-one(T), v_next, v_curr)
+        mv_products = 1
+    end
 
-    AAnorm = 0;
-    sbar   = gama;
-    rhs1   = beta1;
-    tau    = 0;
-    gamold = 0;
-    cold = 1;
-    c = 1; s = 0;
-    resnorm = beta1;
-    q1 = 0; q2 = 0;
+    resnorm = norm(v_curr)
+    reltol = resnorm * tol
 
-    w1 = zeros(n,1);
-    w2 = zeros(n,1);
+    # Last active column of the Hessenberg matrix
+    # and last two entries of the right-hand side
+    H = zeros(HessenbergT, 4)
+    rhs = [resnorm; zero(HessenbergT)]
 
-    reltol = resnorm * tol;
+    # Normalize the first Krylov basis vector
+    scale!(v_curr, inv(resnorm))
+
+    # Givens rotations
+    c_prev, s_prev = one(T), zero(T)
+    c_curr, s_curr = one(T), zero(T)
 
     USYMQRIterable(
         A, x,
-        beta1, u, gama1, v,
-        p, q, beta, gama,
-        AAnorm, sbar, rhs1,tau, gamold, cold,
-        c, s,
-        q1, q2,
-        w1, w2,
-        maxiter, reltol, resnorm
+        v_prev, v_curr, v_next,
+        w_prev, w_curr, w_next,
+        H, rhs,
+        c_prev, s_prev, c_curr, s_curr,
+        mv_products, maxiter, reltol, resnorm
     )
 end
 
@@ -210,13 +209,13 @@ function usymqr!(x, A, b;
         history.mvps = iterable.mv_products
     end
 
-    for (iteration, resnorm) = enumerate(iterable)
-        if log
-            nextiter!(history, mvps = 1)
-            push!(history, :resnorm, resnorm)
-        end
-        verbose && @printf("%3d\t%1.2e\n", iteration, resnorm)
-    end
+   #  for (iteration, resnorm) = enumerate(iterable)
+   #      if log
+   #          nextiter!(history, mvps = 1)
+   #          push!(history, :resnorm, resnorm)
+   #      end
+   #     verbose && @printf("%3d\t%1.2e\n", iteration, resnorm)
+   # end
 
     verbose && println()
     log && setconv(history, converged(iterable))

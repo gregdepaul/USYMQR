@@ -1,9 +1,10 @@
 using IterativeSolvers
-include("../src/usymqr.jl")
+include("usymqr.jl")
 using Base.Test
 using LinearMaps
 
-#@testset "MINRES" begin
+srand(123)
+n = 15
 
 function unsymmetric_problem(T, n)
     A = rand(T, n, n)
