@@ -7,7 +7,6 @@ function unsymmetric_problem(T, n)
     A = rand(T, n, n)
     x = ones(T, n)
     b = A * x
-    A = A + n * I
     A, x, b
 end
 
@@ -19,8 +18,7 @@ A, x, b = unsymmetric_problem(T, n)
 tol = sqrt(eps(real(T)))
 x0 = rand(T, n)
 
-x1, hist1 = usymqr(A, b, maxiter = 10n, tol = tol, log = true)
-x2, hist2 = usymqr!(x0, A, b, maxiter = 10n, tol = tol, log = true, verbose = true, log = true)
+x2, hist2 = usymqr!(x0, A, b, maxiter = 10n, tol = tol, verbose = true, log = true)
 
 
 # @testset "Unsymmetric Matrix{$T}" for T in (Float32, Float64, Complex64, Complex128)

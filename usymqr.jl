@@ -9,8 +9,7 @@ import IterativeSolvers.setconv
 import IterativeSolvers.shrink!
 import IterativeSolvers.nextiter!
 
-
-mutable struct USYMQRIterable{matT, solT, vecT <: DenseVector, smallVecT <: DenseVector, rotT <: Number, realT <: Real}
+mutable struct USYMQRIterable{matT, solT, vecT <: DenseVector, realT <: Real}
     A::matT
     x::solT
 
@@ -34,13 +33,13 @@ mutable struct USYMQRIterable{matT, solT, vecT <: DenseVector, smallVecT <: Dens
     w2::vecT
 
     # rhs is just two active values of the right-hand side.
-    rhs1::smallVecT
-    rhs2::smallVecT
+    rhs1
+    rhs2
 
     # Some Givens rotations
-    c_prev::rotT
-    c::rotT
-    s::rotT
+    c_prev::realT
+    c::realT
+    s::realT
 
     # QR Constants
     tau::realT
@@ -55,8 +54,8 @@ mutable struct USYMQRIterable{matT, solT, vecT <: DenseVector, smallVecT <: Dens
     # Bookkeeping
     mv_products::Int
     maxiter::Int
-    tolerance::realT
-    resnorm::realT
+    tolerance
+    resnorm
 end
 
 function usymqr_iterable!(x, A, b;
@@ -69,9 +68,9 @@ function usymqr_iterable!(x, A, b;
     T = eltype(x)
     HessenbergT = real(T)
 
-    c = rand(T, n, 1);
+    c = rand(T, 1, n);
 
-    beta1 = norm(b);
+    beta1 = real(norm(b));
     gamma = norm(c);
 
     v_prev = similar(b)
@@ -83,48 +82,48 @@ function usymqr_iterable!(x, A, b;
 
     p = similar(v);
     q = similar(u);
-    beta = 0;
-    gamma = 0;
+    beta = 0.0;
+    gamma = 0.0;
 
     sbar = gamma;
     rhs1 = beta1;
-    AAnorm = 0;
-    tau = 0;
-    gamma_prev = 0;
-    c_prev = 1;
-    c = 1;
-    s = 0;
-    q1 = 0;
-    q2 = 0;
-    proj = 0;
+    AAnorm = 0.0;
+    tau = 0.0;
+    gamma_prev = 0.0;
+    c_prev = 1.0;
+    c = 1.0;
+    s = 0.0;
+    q1 = 0.0;
+    q2 = 0.0;
+    proj = 0.0;
 
-    w1 = similar(x)
-    w2 = similar(x)
+    w1 = zerox(A, b)
+    w2 = zerox(A, b)
 
-    mv_products = 0
+    mv_products = 0;
 
     # For nonzero x's, we must do an MV for the initial residual vec
     if !initially_zero
         # Use v_next to store Ax; v_next will soon be overwritten.
-        A_mul_B!(v_next, A, x)
-        axpy!(-one(T), v_next, v_curr)
-        mv_products = 1
+        A_mul_B!(p, A, x)
+        axpy!(-one(T), p, v)
+        mv_products = 1;
     end
 
     resnorm = beta1;
-    reltol = resnorm * tol;
+    #reltol = resnorm * tol;
 
     USYMQRIterable(
         A, x,
         beta, gamma, gamma_prev, proj,
-        v_prev, v, u,
-        p, q,
-        w1, w2,
+        v_prev, v, vec(u),
+        vec(p), vec(q),
+        vec(w1), vec(w2),
         rhs1, 0.0,
         c_prev, c, s,
         tau, sbar, 0.0,
         q1, q2, AAnorm,
-        mv_products, maxiter, reltol, resnorm
+        mv_products, maxiter, tol, resnorm
     )
 end
 
@@ -133,15 +132,17 @@ Anorm(m::USYMQRIterable) = sqrt(m.AAnorm);
 AAnorm(m::USYMQRIterable) = AAnorm(m) + m.proj^2 + m.beta^2 + m.gamma^2;
 
 
-condition1(m::USYMQRIterable) = (Arnorm(m)/(Anorm(m)*m.resnorm) < m.tolerance);
+# condition1(m::USYMQRIterable) = (Arnorm(m)/(Anorm(m)*m.resnorm) < m.tolerance);
 
-condition2(m::USYMQRIterable) = (m.resnorm < m.tolerance*Anorm(m) + m.tolerance);
+# condition2(m::USYMQRIterable) = (m.resnorm < m.tolerance*Anorm(m) + m.tolerance);
 
-converged(m::USYMQRIterable) = m.resnorm ≤ m.tolerance
+function converged(m::USYMQRIterable)
+    abs(m.resnorm) ≤ abs(m.tolerance)
+end
 
 start(::USYMQRIterable) = 1
 
-done(m::USYMQRIterable, iteration::Int) = iteration > m.maxiter || condition1(m) || condition2(m);
+done(m::USYMQRIterable, iteration::Int) = iteration > m.maxiter || converged(m) #|| condition1(m) || condition2(m);
 
 function next(m::USYMQRIterable, iteration::Int)
 
@@ -149,12 +150,14 @@ function next(m::USYMQRIterable, iteration::Int)
     m.tau_prev = m.tau;
 
     # p = A*v - gama*p;
-    p = A_mul_B(p, m.A, m.v);
+    p = m.v;
+    A_mul_B!(p, m.A, m.v);
     axpy!(-m.gamma, m.p, p);
     m.p = p;
 
     #q = A'*u - beta*q;
-    q = Ac_mul_B(q, m.A, m.u);
+    q = m.u;
+    Ac_mul_B!(q, m.A, m.u);
     axpy!(-m.beta, m.q, q);
     m.q = q;
 
@@ -179,18 +182,18 @@ function next(m::USYMQRIterable, iteration::Int)
 
     # Consider using c, s, m.H[3] = givensAlgorithm(m.H[3], m.H[4])
     # Form QR factorization
-    sigma = m.c * m.sbar + m.s * proj;
-    rbar = -m.s * m.sbar + m.c * proj;
+    sigma = m.c * m.sbar + m.s * m.proj;
+    rbar = -m.s * m.sbar + m.c * m.proj;
     m.tau = m.s * m.gamma;
-    m.sbar = m.c * m.gama;
+    m.sbar = m.c * m.gamma;
 
     if iteration == 1
-        rbar = temp;
+        rbar = m.proj;
         m.sbar = m.gamma;
     end
 
-    rho = sqrt(m.rbar^2 + m.beta^2);
-    m.c = m.rbar/rho;
+    rho = sqrt(rbar^2 + m.beta^2);
+    m.c = rbar/rho;
     m.s = m.beta/rho;
 
     # Next rotation
@@ -276,13 +279,13 @@ function usymqr!(x, A, b;
         history.mvps = iterable.mv_products
     end
 
-    # for (iteration, resnorm) = enumerate(iterable)
-    #     if log
-    #         nextiter!(history, mvps = 1)
-    #         push!(history, :resnorm, resnorm)
-    #     end
-    #     verbose && @printf("%3d\t%1.2e\n", iteration, resnorm)
-    # end
+    for (iteration, resnorm) = enumerate(iterable)
+        if log
+            nextiter!(history, mvps = 1)
+            push!(history, :resnorm, resnorm)
+        end
+        verbose && @printf("%3d\t%1.2e\n", iteration, resnorm)
+    end
 
     verbose && println()
     log && setconv(history, converged(iterable))
