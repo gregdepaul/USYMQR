@@ -105,8 +105,10 @@ function usymqr_iterable!(x, A, b;
     # For nonzero x's, we must do an MV for the initial residual vec
     if !initially_zero
         # Use v_next to store Ax; v_next will soon be overwritten.
-        A_mul_B!(p, A, x)
-        axpy!(-one(T), p, v)
+        #A_mul_B!(p, A, x)
+        #axpy!(-one(T), p, v)
+        p = A*x;
+        v = v- one(T)*p;
         mv_products = 1;
     end
 
@@ -148,38 +150,40 @@ function next(m::USYMQRIterable, iteration::Int)
 
     m.v_prev = m.v;
     m.tau_prev = m.tau;
-
+    #print("orig: ",A*m.v -m.gamma*m.p,'\n')
     # p = A*v - gama*p;
-    p = m.v;
-    A_mul_B!(p, m.A, m.v);
-    axpy!(-m.gamma, m.p, p);
-    m.p = p;
-
+    #p = m.v;
+    #A_mul_B!(p, m.A, m.v);
+    #axpy!(-m.gamma, m.p, p);
+    #m.p = p;
+    m.p = A*m.v -m.gamma*m.p;
+    #print(m.p,'\n')
+    #print("other:",m.p,'\n')
     #q = A'*u - beta*q;
-    q = m.u;
-    Ac_mul_B!(q, m.A, m.u);
-    axpy!(-m.beta, m.q, q);
-    m.q = q;
-
+    #q = m.u;
+    #Ac_mul_B!(q, m.A, m.u);
+    #axpy!(-m.beta, m.q, q);
+    #m.q = q;
+    m.q = A'*m.u -m.beta*m.q
     # Orthogonalize w.r.t. m.u
     m.proj = dot(m.p, m.u);
     temp = m.u;
-    m.u = m.p;
-    axpy!(-m.proj, temp, m.u)
+    #m.u = m.p;
+    #axpy!(-m.proj, temp, m.u)
+    m.u = m.p - m.proj*temp;
     m.p = temp;
 
     # Orthogonalize w.r.t. m.v
     temp = m.v;
-    m.v = m.q;
-    axpy!(-m.proj, temp, m.v)
+    #m.v = m.q;
+    #axpy!(-m.proj, temp, m.v)
+    m.v = m.q - m.proj*temp;
     m.q = temp;
-
     # Normalize u, v with beta and gamma
     m.beta = norm(m.u);
     m.gamma = norm(m.v);
     m.u /= m.beta;
     m.v /= m.gamma;
-
     # Consider using c, s, m.H[3] = givensAlgorithm(m.H[3], m.H[4])
     # Form QR factorization
     sigma = m.c * m.sbar + m.s * m.proj;
@@ -195,14 +199,17 @@ function next(m::USYMQRIterable, iteration::Int)
     rho = sqrt(rbar^2 + m.beta^2);
     m.c = rbar/rho;
     m.s = m.beta/rho;
-
     # Next rotation
     temp = m.rhs1;
     m.rhs1 =  m.c * temp;
     m.rhs2 = -m.s * temp;
-
     # Update solution x
-    updateSoln!(m.x, m.rhs1, m.v_prev, m.tau_prev, sigma, rho, m.w1, m.w2)
+    #updateSoln!(m.x, m.rhs1, m.v_prev, m.tau_prev, sigma, rho, m.w1, m.w2)
+    w3 = ( m.v_prev - sigma*m.w2 - m.tau_prev*m.w1 )/rho;
+    m.x = m.x + m.rhs1*w3;
+    m.w1 = m.w2;
+    m.w2 = w3;
+    
 
     # The approximate residual is cheaply available
     m.resnorm = abs(m.rhs2);
@@ -212,15 +219,16 @@ function next(m::USYMQRIterable, iteration::Int)
     m.rhs1 = m.rhs2;
     m.gamma_prev = m.gamma;
     m.c_prev = m.c;
-
     m.resnorm, iteration + 1
 end
 
 
 function updateSoln!(x, rh_s1, v_prev, tau_prev, sigma, rho, w1, w2)
     # Update solution
+    #print(x, '\n')
     w3 = ( v_prev - sigma*w2 - tau_prev*w1 )/rho;
     x = x + rh_s1*w3;
+
     w1 = w2;
     w2 = w3;
 end
@@ -299,4 +307,4 @@ end
 
 Same as [`usymqr!`](@ref), but allocates a solution vector `x` initialized with zeros.
 """
-usymqr(A, b; kwargs...) = usymqr!(zerox(A, b), A, b; initially_zero = true, kwargs...)
+usymqr(A, b; kwargs...) = usymqr!(zerox(A, b), A, b; initially_zero = false, kwargs...)
