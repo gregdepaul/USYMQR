@@ -13,9 +13,19 @@ end
 srand(123)
 n = 100
 
+# T = Float32
+# A, x, b = unsymmetric_problem(T, n)
+# tol = sqrt(eps(real(T)))
+# x0 = rand(T, n)
+#
+# x1, hist1 = usymqr(A, b, maxiter = 10n, tol = tol, log = true)
+# hist1.isconverged
+# norm(b - A * x1) / norm(b) ≤ tol
+# isa(hist1, ConvergenceHistory)
+
 @testset "Unsymmetric Matrix{$T}" for T in (Float32, Float64)
     A, x, b = unsymmetric_problem(T, n)
-    tol = sqrt(eps(real(T)))xx
+    tol = sqrt(eps(real(T)))
     x0 = rand(T, n)
 
     x1, hist1 = usymqr(A, b, maxiter = 10n, tol = tol, log = true)
@@ -24,18 +34,18 @@ n = 100
     @test norm(b - A * x1) / norm(b) ≤ tol
     @test hist1.isconverged
 end
-
-@testset "SparseMatrixCSC{$T}" for T in (Float32, Float64)
-    A = let
-        B = sprand(n, n, 2 / n)
-    end
-
-    x = ones(T, n)
-    b = A * x
-    tol = sqrt(eps(real(T)))
-
-    x_approx, hist = usymqr(A, b, maxiter = 10n, tol = tol, log = true)
-
-    @test norm(b - A * x_approx) / norm(b) ≤ tol
-    @test hist.isconverged
-end
+#
+# @testset "SparseMatrixCSC{$T}" for T in (Float32, Float64)
+#     A = let
+#         B = sprand(n, n, 2 / n)
+#     end
+#
+#     x = ones(T, n)
+#     b = A * x
+#     tol = sqrt(eps(real(T)))
+#
+#     x_approx, hist = usymqr(A, b, maxiter = 10n, tol = tol, log = true)
+#
+#     @test norm(b - A * x_approx) / norm(b) ≤ tol
+#     @test hist.isconverged
+# end
