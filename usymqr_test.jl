@@ -11,11 +11,11 @@ function unsymmetric_problem(T, n)
 end
 
 srand(123)
-n = 10
+n = 100
 
 @testset "Unsymmetric Matrix{$T}" for T in (Float32, Float64)
     A, x, b = unsymmetric_problem(T, n)
-    tol = sqrt(eps(real(T)))
+    tol = sqrt(eps(real(T)))xx
     x0 = rand(T, n)
 
     x1, hist1 = usymqr(A, b, maxiter = 10n, tol = tol, log = true)
