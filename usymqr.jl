@@ -68,17 +68,17 @@ function usymqr_iterable!(x, A, b;
     T = eltype(x)
     HessenbergT = real(T)
 
-    c = rand(T, 1, n);
-
+    #c = rand(T, 1, n);
+    c =  Float32[  0.8147;0.9058;0.1270];
     beta1 = real(norm(b));
     gamma = norm(c);
 
     v_prev = similar(b)
-    v = similar(b)
-    copy!(v, b / beta1)
-
-    u = similar(c)
-    copy!(u, c / gamma)
+    u = similar(b)
+    copy!(u, b / beta1)
+    v = similar(c)
+    copy!(v, c / gamma)
+    print(u,"...",v)
 
     p = similar(v);
     q = similar(u);
@@ -209,7 +209,7 @@ function next(m::USYMQRIterable, iteration::Int)
     m.x = m.x + m.rhs1*w3;
     m.w1 = m.w2;
     m.w2 = w3;
-    
+
 
     # The approximate residual is cheaply available
     m.resnorm = abs(m.rhs2);

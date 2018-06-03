@@ -18,8 +18,8 @@ A, x, b = unsymmetric_problem(T, n)
 tol = sqrt(eps(real(T)))
 #tol = 1e-6;
 #x0 = rand(T, n)
-#A = Float32[[ 0.4173    0.9448    0.3377] ; [0.0497    0.4909    0.9001]; [0.9027    0.4893    0.3692]];
-#b= Float32[ 0.1112;0.7803;0.3897];
+A = Float32[[ 0.4173    0.9448    0.3377] ; [0.0497    0.4909    0.9001]; [0.9027    0.4893    0.3692]];
+b= Float32[ 0.1112;0.7803;0.3897];
 x0 = zeros(T,n)
 x2, hist2 = usymqr!(x0, A, b, maxiter = 10n, tol = tol, verbose = true, log = true)
 
