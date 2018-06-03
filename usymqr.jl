@@ -68,8 +68,8 @@ function usymqr_iterable!(x, A, b;
     T = eltype(x)
     HessenbergT = real(T)
 
-    #c = rand(T, 1, n);
-    c =  Float32[  0.8147;0.9058;0.1270];
+    c = rand(T, 1n);
+    #c =  Float32[  0.8147;0.9058;0.1270];
     beta1 = real(norm(b));
     gamma = norm(c);
 
@@ -78,7 +78,6 @@ function usymqr_iterable!(x, A, b;
     copy!(u, b / beta1)
     v = similar(c)
     copy!(v, c / gamma)
-    print(u,"...",v)
 
     p = similar(v);
     q = similar(u);
