@@ -132,10 +132,9 @@ Arnorm(m::USYMQRIterable) = m.resnorm*norm([m.gamma_prev*m.q1 + m.proj*m.q2; m.g
 Anorm(m::USYMQRIterable) = sqrt(m.AAnorm);
 AAnorm(m::USYMQRIterable) = AAnorm(m) + m.proj^2 + m.beta^2 + m.gamma^2;
 
+condition1(m::USYMQRIterable) = (Arnorm(m)/(Anorm(m)*m.resnorm) < m.tolerance);
 
-# condition1(m::USYMQRIterable) = (Arnorm(m)/(Anorm(m)*m.resnorm) < m.tolerance);
-
-# condition2(m::USYMQRIterable) = (m.resnorm < m.tolerance*Anorm(m) + m.tolerance);
+condition2(m::USYMQRIterable) = (m.resnorm < m.tolerance*Anorm(m) + m.tolerance);
 
 function converged(m::USYMQRIterable)
     abs(m.resnorm) ≤ abs(m.tolerance)
@@ -143,46 +142,30 @@ end
 
 start(::USYMQRIterable) = 1
 
-done(m::USYMQRIterable, iteration::Int) = iteration > m.maxiter || converged(m) #|| condition1(m) || condition2(m);
+done(m::USYMQRIterable, iteration::Int) = iteration > m.maxiter || converged(m) || condition1(m) || condition2(m);
 
 function next(m::USYMQRIterable, iteration::Int)
 
     m.v_prev = m.v;
     m.tau_prev = m.tau;
-    #print("orig: ",A*m.v -m.gamma*m.p,'\n')
-    # p = A*v - gama*p;
-    #p = m.v;
-    #A_mul_B!(p, m.A, m.v);
-    #axpy!(-m.gamma, m.p, p);
-    #m.p = p;
+
+    # Generate Left and Right Eigenvectors
     m.p = A*m.v -m.gamma*m.p;
-    #print(m.p,'\n')
-    #print("other:",m.p,'\n')
-    #q = A'*u - beta*q;
-    #q = m.u;
-    #Ac_mul_B!(q, m.A, m.u);
-    #axpy!(-m.beta, m.q, q);
-    #m.q = q;
-    m.q = A'*m.u -m.beta*m.q
+    m.q = A'*m.u -m.beta*m.q;
+
     # Orthogonalize w.r.t. m.u
     m.proj = dot(m.p, m.u);
-    temp = m.u;
-    #m.u = m.p;
-    #axpy!(-m.proj, temp, m.u)
-    m.u = m.p - m.proj*temp;
-    m.p = temp;
+    m.u, m.p = m.p - m.proj*m.u, m.u;
 
     # Orthogonalize w.r.t. m.v
-    temp = m.v;
-    #m.v = m.q;
-    #axpy!(-m.proj, temp, m.v)
-    m.v = m.q - m.proj*temp;
-    m.q = temp;
+    m.v, m.q = m.q - m.proj*m.v, m.v;
+
     # Normalize u, v with beta and gamma
     m.beta = norm(m.u);
     m.gamma = norm(m.v);
     m.u /= m.beta;
     m.v /= m.gamma;
+
     # Consider using c, s, m.H[3] = givensAlgorithm(m.H[3], m.H[4])
     # Form QR factorization
     sigma = m.c * m.sbar + m.s * m.proj;
@@ -198,17 +181,18 @@ function next(m::USYMQRIterable, iteration::Int)
     rho = sqrt(rbar^2 + m.beta^2);
     m.c = rbar/rho;
     m.s = m.beta/rho;
+
     # Next rotation
     temp = m.rhs1;
     m.rhs1 =  m.c * temp;
     m.rhs2 = -m.s * temp;
+
     # Update solution x
     #updateSoln!(m.x, m.rhs1, m.v_prev, m.tau_prev, sigma, rho, m.w1, m.w2)
     w3 = ( m.v_prev - sigma*m.w2 - m.tau_prev*m.w1 )/rho;
     m.x = m.x + m.rhs1*w3;
     m.w1 = m.w2;
     m.w2 = w3;
-
 
     # The approximate residual is cheaply available
     m.resnorm = abs(m.rhs2);
