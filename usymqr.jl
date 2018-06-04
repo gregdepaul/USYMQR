@@ -183,9 +183,7 @@ function next(m::USYMQRIterable, iteration::Int)
     m.s = m.beta/rho;
 
     # Next rotation
-    temp = m.rhs1;
-    m.rhs1 =  m.c * temp;
-    m.rhs2 = -m.s * temp;
+    m.rhs1, m.rhs2 =  m.c * m.rhs1, -m.s * m.rhs1;
 
     # Update solution x
     #updateSoln!(m.x, m.rhs1, m.v_prev, m.tau_prev, sigma, rho, m.w1, m.w2)
