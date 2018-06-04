@@ -17,9 +17,9 @@ T = Float32
 A, x, b = unsymmetric_problem(T, n)
 tol = sqrt(eps(real(T)))
 x0 = rand(T, n)
-
 x1, hist1 = usymqr(A, b, maxiter = 10n, tol = tol, log = true)
 hist1.isconverged
+hist1[:resnorm]
 norm(b - A * x1) / norm(b) ≤ tol
 isa(hist1, ConvergenceHistory)
 
