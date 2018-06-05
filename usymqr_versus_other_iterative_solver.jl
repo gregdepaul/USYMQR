@@ -1,5 +1,6 @@
 using IterativeSolvers
 include("usymqr.jl")
+include("MarketMatrix.jl")
 using Base.Test
 using LinearMaps
 
@@ -18,6 +19,13 @@ A, x, b = unsymmetric_problem(T, n)
 #tol = sqrt(eps(real(T)))
 tol = 1.0e-6
 
+
+A= Array(MatrixMarket.mmread("hydr1/hydr1.mtx"));
+r,c = size(A);
+n = max(r,c);
+x = ones(T, n);
+b = A*x;
+
 x1, hist1 = usymqr(A, b, maxiter = 10n, tol = tol, log = true)
 x2, hist2 = lsqr(A, b, atol=tol, btol=tol, conlim=1e10, maxiter=10n, log = true)
 x3, hist3 = bicgstabl(A, b, 2, max_mv_products = 10n, log = true)
@@ -34,3 +42,6 @@ plot(err1, yscale=:log10)
 plot!(err2, yscale=:log10)
 plot!(err3, yscale=:log10)
 gui()
+
+
+workspace()
