@@ -20,7 +20,8 @@ A, x, b = unsymmetric_problem(T, n)
 tol = 1.0e-6
 
 
-A= Array(MatrixMarket.mmread("hydr1/hydr1.mtx"));
+#A= Array(MatrixMarket.mmread("hydr1/hydr1.mtx"));
+A= Array(MatrixMarket.mmread("barth/barth.mtx"));
 r,c = size(A);
 n = max(r,c);
 x = ones(T, n);
