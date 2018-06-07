@@ -21,7 +21,7 @@ tol = 1.0e-6
 
 
 #A= Array(MatrixMarket.mmread("hydr1/hydr1.mtx"));
-A= Array(MatrixMarket.mmread("i_laplace_100/i_laplace_100.mtx"));
+A= Array(MatrixMarket.mmread("barth/barth.mtx"));
 r,c = size(A);
 n = max(r,c);
 x = ones(T, n);
@@ -39,8 +39,8 @@ err3 = hist3[:resnorm];
 
 using Plots
 gr(reuse=true)
-plot(err1, yscale=:log10, title="i_laplace_100/i_laplace_100 Residual Plot", xlab="Iteration",ylab="Residual")
+plot(err1, yscale=:log10, title="Nasa/barth Residual Plot", xlab="Iteration",ylab="Residual")
 plot!(err2, yscale=:log10)
 plot!(err3, yscale=:log10)
-savefig("i_laplace_100.png")
+savefig("barth.png")
 gui()
