@@ -21,28 +21,28 @@ tol = 1.0e-6
 
 
 #A= Array(MatrixMarket.mmread("hydr1/hydr1.mtx"));
-A= Array(MatrixMarket.mmread("heat_500/heat_500.mtx"));
+A= Array(MatrixMarket.mmread("g7jac010/g7jac010.mtx"));
 r,c = size(A);
 n = max(r,c);
 x = ones(T, n);
 b = A*x;
 
-x1, hist1 = usymqr(A, b, maxiter = 10n, tol = tol, log = true)
-x2, hist2 = lsqr(A, b, atol=tol, btol=tol, conlim=1e10, maxiter=10n, log = true)
-#x3, hist3 = bicgstabl(A, b, 2, max_mv_products = 1000, log = true)
+x1, hist1 = usymqr(A, b, maxiter = 1000, tol = tol, log = true)
+x2, hist2 = lsqr(A, b, atol=tol, btol=tol, conlim=1e10, maxiter=1000, log = true)
+x3, hist3 = bicgstabl(A, b, 2, max_mv_products = 1000, log = true)
 
 norm(A*x2 - b)
 
 err1 = hist1[:resnorm];
 err2 = hist2[:resnorm];
-#err3 = hist3[:resnorm];
+err3 = hist3[:resnorm];
 
 #labels = ["USYMQR", "LSQR", "BICGSTABL"];
 labels = ["USYMQR", "LSQR"];
 using Plots
 gr(reuse=true)
-plot(err1, yscale=:log10, title="Regtools/heat_500 Residual Plot", xlab="Iteration",ylab="Residual", labels = "USYMQR")
+plot(err1, yscale=:log10, title="Hollinger/g7jac010 Residual Plot", xlab="Iteration",ylab="Residual", labels = "USYMQR")
 plot!(err2, yscale=:log10, labels = "LSQR")
-#plot!(err3, yscale=:log10)
-savefig("heat_500.png")
+plot!(err3, yscale=:log10, labels = "BICGSTABL")
+savefig("g7jac010.png")
 gui()
